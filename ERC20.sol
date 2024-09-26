@@ -12,25 +12,26 @@ interface IERC20 {
 contract ERC20 is IERC20 {
     address public immutable owner;
     uint public totalSupply;
-    mapping(address => uint) public balanceOf;
+    mapping (address => uint) public balanceOf;
 
-    struct Item {
-        uint itemId;
-        string itemName;
-        uint itemPrice;
+    struct ToDo {
+        uint taskId;
+        string description;
+        bool isCompleted;
+        uint timestamp;
     }
     
-    mapping(uint => Item) public items;
-    uint public itemCount;
+    mapping(uint => ToDo) public toDoList;
+    uint public taskCount;
+
+    // Event to log ToDo actions
+    event ToDoAdded(uint indexed taskId, string description, uint timestamp);
+    event ToDoCompleted(uint indexed taskId);
+    event ToDoUpdated(uint indexed taskId, string newDescription);
 
     constructor() {
         owner = msg.sender;
         totalSupply = 0;
-
-        // Initialize the items
-        addItem("Book", 10);    // Item ID 1
-        addItem("Pen", 5);      // Item ID 2
-        addItem("Laptop", 1000); // Item ID 3
     }
 
     modifier onlyOwner {
@@ -52,7 +53,7 @@ contract ERC20 is IERC20 {
         return true;
     }
 
-    function mint(address receiver, uint amount) external onlyOwner {
+    function mint(address receiver,uint amount) external onlyOwner {
         balanceOf[receiver] += amount;
         totalSupply += amount;
         emit Transfer(address(0), receiver, amount);
@@ -67,30 +68,47 @@ contract ERC20 is IERC20 {
         emit Transfer(msg.sender, address(0), amount);
     }
     
-    function addItem(string memory itemName, uint256 itemPrice) public onlyOwner {
-        itemCount++;
-        Item memory newItem = Item(itemCount, itemName, itemPrice);
-        items[itemCount] = newItem;
+    // Function to add a new to-do task
+    function addToDo(string memory description) external onlyOwner {
+        taskCount++;
+        toDoList[taskCount] = ToDo({
+            taskId: taskCount,
+            description: description,
+            isCompleted: false,
+            timestamp: block.timestamp
+        });
+        emit ToDoAdded(taskCount, description, block.timestamp);
     }
 
-    function getItems() external view returns (Item[] memory) {
-        Item[] memory allItems = new Item[](itemCount);
-        
-        for (uint i = 1; i <= itemCount; i++) {
-            allItems[i - 1] = items[i];
-        }
-        
-        return allItems;
+    // Function to update a to-do task's description
+    function updateToDoDescription(uint taskId, string memory newDescription) external onlyOwner {
+        ToDo storage task = toDoList[taskId];
+        require(bytes(task.description).length != 0, "Task with the given ID does not exist");
+        task.description = newDescription;
+        emit ToDoUpdated(taskId, newDescription);
     }
-    
-    function redeem(uint itemId) external {
-        require(itemId > 0 && itemId <= itemCount, "Invalid item ID");
-        Item memory redeemedItem = items[itemId];
-        
-        require(balanceOf[msg.sender] >= redeemedItem.itemPrice, "Insufficient balance to redeem");
-        
-        balanceOf[msg.sender] -= redeemedItem.itemPrice;
-        balanceOf[owner] += redeemedItem.itemPrice;
-        emit Transfer(msg.sender, address(0), redeemedItem.itemPrice);
+
+    // Function to mark a to-do task as completed
+    function completeToDoTask(uint taskId) external onlyOwner {
+        ToDo storage task = toDoList[taskId];
+        require(bytes(task.description).length != 0, "Task with the given ID does not exist");
+        require(!task.isCompleted, "Task is already completed");
+        task.isCompleted = true;
+        emit ToDoCompleted(taskId);
+    }
+
+    // Function to get all tasks in the to-do list
+    function getAllToDos() external view returns (ToDo[] memory) {
+        ToDo[] memory allTasks = new ToDo[](taskCount);
+        for (uint i = 1; i <= taskCount; i++) {
+            allTasks[i - 1] = toDoList[i];
+        }
+        return allTasks;
+    }
+
+    // Function to get a single to-do task by ID
+    function getToDoById(uint taskId) external view returns (ToDo memory) {
+        return toDoList[taskId];
     }
 }
+
