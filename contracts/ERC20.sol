@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity ^0.8.19;
 
 interface IERC20 {
     function totalSupply() external view returns (uint);
     function balanceOf(address account) external view returns (uint);
     function transfer(address recipient, uint amount) external returns (bool);
-    
+
     event Transfer(address indexed from, address indexed to, uint amount);
 }
 
@@ -18,6 +18,7 @@ contract ERC20 is IERC20 {
         uint taskId;
         string description;
         bool isCompleted;
+        bool isRedeemed;
         uint timestamp;
     }
     
@@ -28,6 +29,7 @@ contract ERC20 is IERC20 {
     event ToDoAdded(uint indexed taskId, string description, uint timestamp);
     event ToDoCompleted(uint indexed taskId);
     event ToDoUpdated(uint indexed taskId, string newDescription);
+    event ToDoRedeemed(uint indexed taskId, address redeemer, uint redeemedAmount);
 
     constructor() {
         owner = msg.sender;
@@ -47,6 +49,7 @@ contract ERC20 is IERC20 {
         require(balanceOf[msg.sender] >= amount, "The balance is insufficient");
 
         balanceOf[msg.sender] -= amount;
+        totalSupply -=amount;
         balanceOf[recipient] += amount;
 
         emit Transfer(msg.sender, recipient, amount);
@@ -59,7 +62,7 @@ contract ERC20 is IERC20 {
         emit Transfer(address(0), receiver, amount);
     }
 
-    function burn(uint amount) external {
+    function burn(uint amount) public{
         require(amount > 0, "Amount should not be zero");
         require(balanceOf[msg.sender] >= amount, "The balance is insufficient");
         balanceOf[msg.sender] -= amount;
@@ -75,6 +78,7 @@ contract ERC20 is IERC20 {
             taskId: taskCount,
             description: description,
             isCompleted: false,
+            isRedeemed: false,
             timestamp: block.timestamp
         });
         emit ToDoAdded(taskCount, description, block.timestamp);
@@ -97,6 +101,23 @@ contract ERC20 is IERC20 {
         emit ToDoCompleted(taskId);
     }
 
+
+    // Function to redeem a completed to-do task by burning 100 tokens
+    function redeemToDoTask(uint taskId) external onlyOwner{
+        ToDo storage task = toDoList[taskId];
+        require(task.isCompleted, "Task must be completed before redeeming");
+        require(!task.isRedeemed, "Task has already been redeemed");
+
+        uint amountToRedeem = 100; // Redeem the entire balance
+        require(amountToRedeem > 0, "Insufficient balance to redeem");
+
+        task.isRedeemed = true;
+        burn(amountToRedeem); // Burn 100 tokens
+
+        emit ToDoRedeemed(taskId, msg.sender, amountToRedeem);
+    }
+
+
     // Function to get all tasks in the to-do list
     function getAllToDos() external view returns (ToDo[] memory) {
         ToDo[] memory allTasks = new ToDo[](taskCount);
@@ -111,4 +132,3 @@ contract ERC20 is IERC20 {
         return toDoList[taskId];
     }
 }
-
